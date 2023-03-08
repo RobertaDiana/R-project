@@ -1,0 +1,117 @@
+library(shiny)
+
+ui <- fluidPage(
+  titlePanel("Generare de variabile aleatoare repartizate normal"),
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons("method", "Alegeți metoda:",
+                   c("Acceptare-respingere" = "AR",
+                     "Box-Muller" = "BM")),
+      actionButton("generate", "Generează"),
+      plotOutput("densityPlot"),
+      radioButtons("fct", "Alegeți functia de densitate:",
+                   c("(3/2)*(x^3), cu 0 <= x <= 1" = "f1",
+                     "(3/2)*(x^3)+(11/8)*(x^2)+(1/6)*(x)+(1/12), cu 0 <= x <= 1" = "f2"))
+    ),
+    mainPanel(
+      h3("Distribuția variabilei aleatoare"),
+      plotOutput("histPlot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  observeEvent(input$generate, {
+    if (input$method == "AR" && input$fct == "f1") {
+      x <- ar_normal_f1()
+    }else if (input$method == "AR" && input$fct == "f2") {
+      x <- ar_normal_f1()
+    } else if (input$method == "BM") {
+      x <- bm_normal()
+    }
+    output$densityPlot <- renderPlot({
+      x_density <- density(x)
+      plot(x_density, main = "Densitatea variabilei aleatoare")
+    })
+    output$histPlot <- renderPlot({
+      hist(x, main = "Histograma variabilei aleatoare")
+    })
+  })
+}
+
+# Pasii accept-reject algoritm:
+# Consideram X ~ g(X) (Unif [0,1])
+# Consideram U ~ Unif[0,1]
+# Acceptam Xi daca Ui <= pi(Xi)/c x g(Xi)
+# altfel reject
+
+ar_normal_f1 <- function(fct) {
+  X = runif(4500, 0, 1)     #generare 4500 de variabile aleatoare uniforme
+  U = runif(4500, 0, 1)
+  
+  pi_x <- function(x) {
+    new_x = (3/2)*(x^3)  #o functie
+    return(new_x)
+  }
+  
+  count = 1
+  #un vector gol pentru sample random 
+  accept = c()
+  
+  #cat inca avem sample-uri si mai putin de 1000 care au fost acceptate
+  while(count <= 4500 & length(accept) < 1000){
+    #alegem 1 random sample din U 
+    test_u = U[count]
+    #3.2 e constanta noastra 
+    test_x = pi_x(X[count])/(3.2*dunif(X[count],0,1))
+    if (test_u <= test_x){
+      accept = rbind(accept, X[count])
+      count = count + 1
+    }
+    count = count + 1
+  }
+  
+  return(accept)
+}
+
+ar_normal_f2 <- function() {
+  #genereaza nr random
+  X = runif(4500, 0, 1)
+  U = runif(4500, 0, 1)
+  
+  pi_x <- function(x) {
+    new_x = (3/2)*(x^3)+(11/8)*(x^2)+(1/6)*(x)+(1/12)
+    return(new_x)
+  }
+  
+  count = 1
+  accept = c()
+  #dunif densitatea unei fct de distributie 
+  
+  while(count <= 4500 & length(accept) < 1000){
+    test_u = U[count]
+    test_x = pi_x(X[count])/(3.125*dunif(X[count],0,1))
+    if (test_u <= test_x){
+      accept = rbind(accept, X[count])
+      count = count + 1
+    }
+    count = count + 1
+  }
+  
+  return(accept)
+}
+
+bm_normal <- function() {
+  #u1 si u2 sunt genretate random alese din distributia uniforma pe intervalul [0,1]
+  u1 <- runif(1000)
+  u2 <- runif(1000)
+  
+  #Aplicare formula
+  z1 <- sqrt(-2 * log(u1)) * cos(2 * pi * u2)
+  z2 <- sqrt(-2 * log(u1)) * sin(2 * pi * u2)
+  
+  #atunci z1, z2 sunt variabile aleatoare independente cu distributie normala
+  return(c(z1, z2))
+}
+
+shinyApp(ui = ui, server = server)
